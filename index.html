@@ -244,6 +244,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
       </div>
       <button id="gEnter" class="btn">입장</button>
       <button id="gAdminBtn" class="btn ghost sm" style="width:100%;margin-top:10px">관리자 모드</button>
+      <div id="connState" style="text-align:center;font-size:12px;margin-top:14px;color:var(--sub)">● 서버 연결 확인 중…</div>
     </div>
   </div>
 
@@ -379,7 +380,7 @@ const firebaseConfig = {
 };
 
 /* ⚙️ 2) 관리자 마스터 PIN — 원하는 숫자로 바꾸세요 */
-const ADMIN_PIN = "5160";
+const ADMIN_PIN = "1234";
 
 /* ⚙️ 3) 운영 팀 수 (1~12팀) */
 const TEAM_COUNT = 12;
@@ -471,29 +472,44 @@ document.getElementById("gMember").addEventListener("change",e=>{
 });
 
 document.getElementById("gEnter").addEventListener("click",async()=>{
+  const btn=document.getElementById("gEnter");
   const tid=document.getElementById("gTeam").value;
   const mv=document.getElementById("gMember").value;
   const pin=document.getElementById("gPin").value.trim();
   if(!tid){ toast("팀을 선택하세요"); return; }
   if(!mv){ toast("이름을 선택하세요"); return; }
 
+  let nm="";
   if(mv==="__new__"){
-    const nm=document.getElementById("gNewName").value.trim();
+    nm=document.getElementById("gNewName").value.trim();
     if(!nm){ toast("이름을 입력하세요"); return; }
     if(PIN_REQUIRED && pin.length!==4){ toast("PIN 4자리를 설정하세요"); return; }
-    const newRef=ref("members").push();
-    await newRef.set({name:nm,teamId:Number(tid),pin:PIN_REQUIRED?pin:"",createdAt:Date.now()});
-    ME={id:newRef.key,name:nm,teamId:Number(tid)};
   }else{
     const m=MEMBERS[mv];
     if(PIN_REQUIRED){
       if(pin.length!==4){ toast("PIN 4자리를 입력하세요"); return; }
       if(m.pin && m.pin!==pin){ toast("PIN이 틀렸어요"); return; }
-      if(!m.pin){ await ref("members/"+mv+"/pin").set(pin); } // 기존에 PIN없던 사람은 이번에 설정
     }
-    ME={id:mv,name:m.name,teamId:m.teamId};
   }
-  enterApp();
+
+  btn.disabled=true; btn.textContent="접속 중…";
+  try{
+    if(mv==="__new__"){
+      const newRef=ref("members").push();
+      await newRef.set({name:nm,teamId:Number(tid),pin:PIN_REQUIRED?pin:"",createdAt:Date.now()});
+      ME={id:newRef.key,name:nm,teamId:Number(tid)};
+    }else{
+      const m=MEMBERS[mv];
+      if(PIN_REQUIRED && !m.pin){ await ref("members/"+mv+"/pin").set(pin); } // 기존에 PIN없던 사람은 이번에 설정
+      ME={id:mv,name:m.name,teamId:m.teamId};
+    }
+    enterApp();
+  }catch(err){
+    btn.disabled=false; btn.textContent="입장";
+    const msg=(err&&err.message)?err.message:String(err);
+    toast("저장 실패");
+    alert("⚠️ Firebase 저장 실패\n\n"+msg+"\n\n주로 두 가지 원인이에요:\n1) Realtime Database 규칙(.write)이 막힘\n2) firebaseConfig 값이 잘못됨");
+  }
 });
 
 /* ============================================================
@@ -751,6 +767,13 @@ document.querySelectorAll(".tb").forEach(b=>b.addEventListener("click",()=>page(
 
 /* ---------- 유틸 ---------- */
 function esc(s){ return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+/* ---------- 서버 연결 상태 ---------- */
+db.ref(".info/connected").on("value",s=>{
+  const on=s.val()===true;
+  const el=document.getElementById("connState");
+  if(el){ el.textContent=on?"● 서버 연결됨":"● 서버 연결 안 됨 — 설정 확인 필요"; el.style.color=on?"var(--teal)":"var(--red)"; }
+});
 
 /* ---------- 시작 ---------- */
 initGate();
