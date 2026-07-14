@@ -11,12 +11,6 @@
 <link rel="stylesheet" as="style" crossorigin
   href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
 
-<!-- ============================================================
-     Firebase (compat)
-============================================================ -->
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
-
 <style>
 :root{
   --bg:#0E1522;
@@ -370,13 +364,13 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
    Firebase 콘솔 → 프로젝트 설정 → '내 앱' → SDK 설정에서 복사
 ============================================================ */
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_PROJECT.firebaseapp.com",
-  databaseURL: "https://YOUR_PROJECT-default-rtdb.firebaseio.com",
-  projectId: "YOUR_PROJECT",
-  storageBucket: "YOUR_PROJECT.appspot.com",
-  messagingSenderId: "YOUR_SENDER_ID",
-  appId: "YOUR_APP_ID"
+  apiKey: "AIzaSyBU__sc4ejEOlLLCGzXKynxq_wSqq5F5qk",
+  authDomain: "ploomranking.firebaseapp.com",
+  databaseURL: "https://ploomranking-default-rtdb.firebaseio.com",
+  projectId: "ploomranking",
+  storageBucket: "ploomranking.firebasestorage.app",
+  messagingSenderId: "630757307385",
+  appId: "1:630757307385:web:e43350234abde1c949c328"
 };
 
 /* ⚙️ 2) 관리자 마스터 PIN — 원하는 숫자로 바꾸세요 */
@@ -389,9 +383,34 @@ const TEAM_COUNT = 12;
 const ROOT = "ploomRanking";
 /* ============================================================ */
 
-firebase.initializeApp(firebaseConfig);
-const db = firebase.database();
-const ref = (p) => db.ref(ROOT + "/" + p);
+/* ============================================================
+   REST 기반 DB 통신 (WebSocket 대신 일반 HTTPS 요청 + 폴링)
+   → 매장/사내 와이파이의 방화벽이 실시간 스트리밍 연결을 막는
+     경우가 있어, 훨씬 더 잘 뚫리는 일반 HTTPS 방식으로 통신함.
+============================================================ */
+const DB_URL = firebaseConfig.databaseURL;
+function dbPath(p){ return `${DB_URL}/${ROOT}/${p}.json`; }
+async function dbGet(path){
+  const r = await fetch(dbPath(path), {cache:"no-store"});
+  if(!r.ok) throw new Error("서버 응답 오류 ("+r.status+")");
+  return await r.json();
+}
+async function dbSet(path, val){
+  const r = await fetch(dbPath(path), {method:"PUT", headers:{"Content-Type":"application/json"}, body:JSON.stringify(val)});
+  if(!r.ok) throw new Error("저장 오류 ("+r.status+")");
+  return await r.json();
+}
+async function dbPush(path, val){
+  const r = await fetch(dbPath(path), {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(val)});
+  if(!r.ok) throw new Error("저장 오류 ("+r.status+")");
+  const data = await r.json();
+  return data.name;
+}
+async function dbRemove(path){
+  const r = await fetch(dbPath(path), {method:"DELETE"});
+  if(!r.ok) throw new Error("삭제 오류 ("+r.status+")");
+  return true;
+}
 
 /* ---------- 상태 ---------- */
 let ME = null;               // {id, name, teamId}
@@ -495,41 +514,38 @@ document.getElementById("gEnter").addEventListener("click",async()=>{
   btn.disabled=true; btn.textContent="접속 중…";
   try{
     if(mv==="__new__"){
-      const newRef=ref("members").push();
-      await newRef.set({name:nm,teamId:Number(tid),pin:PIN_REQUIRED?pin:"",createdAt:Date.now()});
-      ME={id:newRef.key,name:nm,teamId:Number(tid)};
+      const id = await dbPush("members", {name:nm,teamId:Number(tid),pin:PIN_REQUIRED?pin:"",createdAt:Date.now()});
+      ME={id,name:nm,teamId:Number(tid)};
     }else{
       const m=MEMBERS[mv];
-      if(PIN_REQUIRED && !m.pin){ await ref("members/"+mv+"/pin").set(pin); } // 기존에 PIN없던 사람은 이번에 설정
+      if(PIN_REQUIRED && !m.pin){ await dbSet("members/"+mv+"/pin", pin); } // 기존에 PIN없던 사람은 이번에 설정
       ME={id:mv,name:m.name,teamId:m.teamId};
     }
-    enterApp();
+    await enterApp();
   }catch(err){
     btn.disabled=false; btn.textContent="입장";
     const msg=(err&&err.message)?err.message:String(err);
     toast("저장 실패");
-    alert("⚠️ Firebase 저장 실패\n\n"+msg+"\n\n주로 두 가지 원인이에요:\n1) Realtime Database 규칙(.write)이 막힘\n2) firebaseConfig 값이 잘못됨");
+    alert("⚠️ 서버 연결 실패\n\n"+msg+"\n\n네트워크 연결을 확인하고 다시 시도해 주세요.\n(와이파이가 불안정하면 데이터로 전환해보세요)");
   }
 });
 
 /* ============================================================
    앱 진입 + 차단 감시
 ============================================================ */
-function enterApp(){
+async function enterApp(){
   document.getElementById("tbName").textContent=ME.name;
   document.getElementById("tbTeam").textContent=teamName(ME.teamId);
   document.getElementById("tbDate").textContent=fmtDate(todayKey());
   document.getElementById("rDesc").innerHTML=`${teamName(ME.teamId)} · <span id="rDate">${fmtDate(todayKey())}</span>`;
 
-  // 실시간 차단 감시
-  ref("blocks/"+ME.id).on("value",snap=>{
-    const b=snap.val();
-    if(b && (b.type==="permanent" || (b.type==="day" && b.date===todayKey()))){
-      showBlocked(b.type);
-    }else{
-      show("app"); page("Home");
-    }
-  });
+  try{ BLOCKS = await dbGet("blocks") || {}; }catch(e){}
+  const b=BLOCKS[ME.id];
+  if(b && (b.type==="permanent" || (b.type==="day" && b.date===todayKey()))){
+    showBlocked(b.type);
+  }else{
+    show("app"); page("Home");
+  }
   loadStores();
 }
 function showBlocked(type){
@@ -544,18 +560,56 @@ function showBlocked(type){
 }
 
 /* ============================================================
-   전역 데이터 구독
+   전역 데이터 — 주기적 폴링 (WebSocket 대신 일반 HTTPS 요청)
 ============================================================ */
-ref("settings/pinRequired").on("value",s=>{
-  PIN_REQUIRED = s.val()!==false;
-  const sw=document.getElementById("pinSw"); if(sw) sw.classList.toggle("on",PIN_REQUIRED);
-});
-ref("members").on("value",s=>{ MEMBERS=s.val()||{}; if(document.getElementById("admin").classList.contains("hidden")===false) renderAdminMembers(); });
-ref("blocks").on("value",s=>{ BLOCKS=s.val()||{}; });
-ref("sales/"+todayKey()).on("value",s=>{
-  SALES_TODAY=s.val()||{};
-  if(!document.getElementById("pgHome").classList.contains("hidden")) renderHome();
-});
+async function pollSettings(){
+  try{
+    const v = await dbGet("settings/pinRequired");
+    PIN_REQUIRED = v!==false;
+    const sw=document.getElementById("pinSw"); if(sw) sw.classList.toggle("on",PIN_REQUIRED);
+  }catch(e){}
+}
+async function pollMembers(){
+  try{
+    MEMBERS = await dbGet("members") || {};
+    if(document.getElementById("admin").classList.contains("hidden")===false) renderAdminMembers();
+  }catch(e){}
+}
+async function pollBlocksLoop(){
+  try{
+    BLOCKS = await dbGet("blocks") || {};
+    if(ME){
+      const b=BLOCKS[ME.id];
+      const isBlocked = b && (b.type==="permanent" || (b.type==="day" && b.date===todayKey()));
+      if(isBlocked){ showBlocked(b.type); }
+      else if(!document.getElementById("blocked").classList.contains("hidden")){ show("app"); page("Home"); }
+    }
+  }catch(e){}
+}
+async function pollSales(){
+  try{
+    SALES_TODAY = await dbGet("sales/"+todayKey()) || {};
+    if(!document.getElementById("pgHome").classList.contains("hidden")) renderHome();
+  }catch(e){}
+}
+async function checkConnection(){
+  try{ await dbGet("settings/pinRequired"); setConnState(true); }
+  catch(e){ setConnState(false); }
+}
+function setConnState(ok){
+  const el=document.getElementById("connState");
+  if(el){ el.textContent=ok?"● 서버 연결됨":"● 서버 연결 안 됨 — 네트워크 확인 필요"; el.style.color=ok?"var(--teal)":"var(--red)"; }
+}
+async function initData(){
+  await Promise.all([pollSettings(), pollMembers(), checkConnection()]);
+  initGate();
+  // 폴링 시작 (게이트/앱/관리자 어느 화면이든 이 하나로 다 커버됨 - 각 함수 내부에서 필요할 때만 반영)
+  setInterval(pollSettings, 8000);
+  setInterval(pollMembers, 5000);
+  setInterval(pollBlocksLoop, 4000);
+  setInterval(pollSales, 4000);
+  setInterval(checkConnection, 6000);
+}
 
 /* ============================================================
    홈: 팀랭킹 + 개인랭킹
@@ -614,15 +668,22 @@ function renderHome(){
 /* ============================================================
    마감보고
 ============================================================ */
-function loadStores(){
-  ref("teams/"+ME.teamId+"/stores").on("value",s=>{
-    STORES=s.val()||{};
-    const sel=document.getElementById("rStore");
-    const cur=sel.value;
-    sel.innerHTML='<option value="">— 점포 선택 —</option>';
-    Object.entries(STORES).forEach(([id,st])=>sel.innerHTML+=`<option value="${id}">${esc(st.name)}</option>`);
-    if(STORES[cur]) sel.value=cur;
-  });
+function renderStoreOptions(){
+  const sel=document.getElementById("rStore");
+  const cur=sel.value;
+  sel.innerHTML='<option value="">— 점포 선택 —</option>';
+  Object.entries(STORES).forEach(([id,st])=>sel.innerHTML+=`<option value="${id}">${esc(st.name)}</option>`);
+  if(STORES[cur]) sel.value=cur;
+}
+let storesPolling=false;
+async function loadStores(){
+  try{ STORES = await dbGet("teams/"+ME.teamId+"/stores") || {}; renderStoreOptions(); }catch(e){}
+  if(!storesPolling){
+    storesPolling=true;
+    setInterval(async()=>{
+      try{ STORES = await dbGet("teams/"+ME.teamId+"/stores") || {}; renderStoreOptions(); }catch(e){}
+    }, 6000);
+  }
 }
 function openReport(){
   const mine=SALES_TODAY[ME.id];
@@ -641,19 +702,31 @@ document.querySelectorAll(".chip").forEach(c=>c.addEventListener("click",()=>{
 document.getElementById("rAddStore").addEventListener("click",async()=>{
   const nm=document.getElementById("rNewStore").value.trim();
   if(!nm) return;
-  const r=ref("teams/"+ME.teamId+"/stores").push();
-  await r.set({name:nm});
-  document.getElementById("rNewStore").value="";
-  setTimeout(()=>{document.getElementById("rStore").value=r.key;},300);
-  toast("점포 추가됨");
+  try{
+    const id = await dbPush("teams/"+ME.teamId+"/stores", {name:nm});
+    document.getElementById("rNewStore").value="";
+    STORES[id]={name:nm};
+    renderStoreOptions();
+    document.getElementById("rStore").value=id;
+    toast("점포 추가됨");
+  }catch(err){ toast("저장 실패 — 네트워크 확인"); }
 });
 document.getElementById("rSave").addEventListener("click",async()=>{
+  const btn=document.getElementById("rSave");
   const storeId=document.getElementById("rStore").value;
-  await ref("sales/"+todayKey()+"/"+ME.id).set({
-    units:reportCount, teamId:ME.teamId, name:ME.name, storeId:storeId||"", ts:Date.now()
-  });
-  const n=document.getElementById("rSavedNote"); n.classList.remove("hidden");
-  toast("마감 저장 완료 ("+reportCount+"대)");
+  btn.disabled=true; btn.textContent="저장 중…";
+  try{
+    await dbSet("sales/"+todayKey()+"/"+ME.id, {
+      units:reportCount, teamId:ME.teamId, name:ME.name, storeId:storeId||"", ts:Date.now()
+    });
+    const n=document.getElementById("rSavedNote"); n.classList.remove("hidden");
+    toast("마감 저장 완료 ("+reportCount+"대)");
+  }catch(err){
+    toast("저장 실패 — 네트워크 확인");
+    alert("⚠️ 저장 실패\n\n네트워크 연결을 확인하고 다시 시도해 주세요.");
+  }finally{
+    btn.disabled=false; btn.textContent="마감 저장";
+  }
 });
 
 /* ============================================================
@@ -669,8 +742,8 @@ async function renderWeek(){
   document.getElementById("wRange").textContent=`${fmtDate(dates[0])} ~ ${fmtDate(dates[6])}`;
   const teamSum={}, soloSum={};
   for(const dk of dates){
-    const snap=await ref("sales/"+dk).get();
-    const data=snap.val()||{};
+    let data={};
+    try{ data = await dbGet("sales/"+dk) || {}; }catch(e){}
     Object.entries(data).forEach(([id,v])=>{
       const u=v.units||0;
       teamSum[v.teamId]=(teamSum[v.teamId]||0)+u;
@@ -713,8 +786,11 @@ function openAdmin(){
 }
 document.getElementById("pinSw").addEventListener("click",async function(){
   const next=!this.classList.contains("on");
-  await ref("settings/pinRequired").set(next);
-  toast(next?"PIN 요구 켜짐":"PIN 요구 꺼짐");
+  try{
+    await dbSet("settings/pinRequired", next);
+    PIN_REQUIRED=next; this.classList.toggle("on",next);
+    toast(next?"PIN 요구 켜짐":"PIN 요구 꺼짐");
+  }catch(err){ toast("저장 실패 — 네트워크 확인"); }
 });
 function renderAdminMembers(){
   const filter=document.getElementById("aTeam").value;
@@ -751,15 +827,21 @@ window.manageMember=function(id,name){
   document.body.appendChild(bg);
 };
 window.doBlock=async function(id,type){
-  await ref("blocks/"+id).set(type==="day"?{type:"day",date:todayKey()}:{type:"permanent"});
-  document.querySelector(".modal-bg")?.remove();
-  toast(type==="day"?"오늘 차단됨":"영구 차단됨");
-  renderAdminMembers();
+  try{
+    await dbSet("blocks/"+id, type==="day"?{type:"day",date:todayKey()}:{type:"permanent"});
+    BLOCKS[id]=type==="day"?{type:"day",date:todayKey()}:{type:"permanent"};
+    document.querySelector(".modal-bg")?.remove();
+    toast(type==="day"?"오늘 차단됨":"영구 차단됨");
+    renderAdminMembers();
+  }catch(err){ toast("저장 실패 — 네트워크 확인"); }
 };
 window.unblock=async function(id){
-  await ref("blocks/"+id).remove();
-  document.querySelector(".modal-bg")?.remove();
-  toast("차단 해제됨"); renderAdminMembers();
+  try{
+    await dbRemove("blocks/"+id);
+    delete BLOCKS[id];
+    document.querySelector(".modal-bg")?.remove();
+    toast("차단 해제됨"); renderAdminMembers();
+  }catch(err){ toast("저장 실패 — 네트워크 확인"); }
 };
 
 /* ---------- 탭 이벤트 ---------- */
@@ -768,15 +850,8 @@ document.querySelectorAll(".tb").forEach(b=>b.addEventListener("click",()=>page(
 /* ---------- 유틸 ---------- */
 function esc(s){ return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
-/* ---------- 서버 연결 상태 ---------- */
-db.ref(".info/connected").on("value",s=>{
-  const on=s.val()===true;
-  const el=document.getElementById("connState");
-  if(el){ el.textContent=on?"● 서버 연결됨":"● 서버 연결 안 됨 — 설정 확인 필요"; el.style.color=on?"var(--teal)":"var(--red)"; }
-});
-
 /* ---------- 시작 ---------- */
-initGate();
+initData();
 </script>
 </body>
 </html>
