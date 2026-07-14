@@ -152,6 +152,35 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
 .store-add{display:flex;gap:8px;margin-top:10px}
 .store-add .inp{flex:1}
 
+/* ---------- 색상 선택 ---------- */
+.color-row{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;margin-bottom:20px}
+.color-chip{
+  display:flex;flex-direction:column;align-items:center;gap:7px;padding:12px 4px;border-radius:13px;
+  background:var(--card2);border:2px solid var(--line);transition:border .15s,transform .08s;
+}
+.color-chip:active{transform:scale(.96)}
+.color-chip .sw{width:28px;height:28px;border-radius:50%;border:1px solid rgba(255,255,255,.15)}
+.color-chip span{font-size:12px;font-weight:700;color:var(--sub)}
+.color-chip.on{border-color:var(--gold)}
+.color-chip.on span{color:var(--tx)}
+.sw-black{background:#232733}
+.sw-silver{background:linear-gradient(135deg,#E7ECF2,#B9C2CE)}
+.sw-navy{background:linear-gradient(135deg,#2C4373,#16233F)}
+.sw-rose{background:linear-gradient(135deg,#E8B4B8,#C88A93)}
+
+/* ---------- 오늘 등록 내역 ---------- */
+.entries-head{display:flex;align-items:center;justify-content:space-between;margin:22px 0 10px}
+.entries-head h3{font-size:14px;font-weight:800;color:var(--sub)}
+.entries-head .tot{font-size:13px;color:var(--gold);font-weight:700}
+.entry-row{display:flex;align-items:center;gap:11px;padding:11px 12px;background:var(--card2);border:1px solid var(--line);border-radius:12px;margin-bottom:7px}
+.entry-row .ecolor{width:18px;height:18px;border-radius:50%;flex:none;border:1px solid rgba(255,255,255,.15)}
+.entry-row .einfo{flex:1;min-width:0}
+.entry-row .einfo .ename{font-size:14px;font-weight:700}
+.entry-row .einfo .etime{font-size:11px;color:var(--sub);margin-top:1px}
+.entry-row .eqty{font-size:14px;font-weight:800;color:var(--gold)}
+.entry-row .edel{width:26px;height:26px;border-radius:8px;background:var(--bg2);color:var(--sub);font-size:13px;flex:none}
+.entry-row .edel:active{background:var(--red);color:#fff}
+
 /* ---------- 하단 탭 ---------- */
 .tabbar{
   position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:520px;z-index:30;
@@ -254,7 +283,10 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
   <div id="app" class="hidden" style="flex:1;display:flex;flex-direction:column">
     <div class="topbar">
       <div class="who">안녕하세요, <b id="tbName">—</b> · <span id="tbTeam">—</span></div>
-      <div class="date" id="tbDate">—</div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <div class="date" id="tbDate">—</div>
+        <button id="logoutBtn" style="font-size:12px;color:var(--sub);background:none;font-weight:600;text-decoration:underline">로그아웃</button>
+      </div>
     </div>
 
     <!-- 홈 -->
@@ -263,6 +295,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
         <div class="k">오늘 전체 판매</div>
         <div class="big tnum"><span id="hTotal">0</span><small>대</small></div>
         <div class="unit" id="hMeta">— 명 보고 완료</div>
+        <div id="hColors" style="display:flex;gap:8px;justify-content:center;margin-top:14px;flex-wrap:wrap"></div>
       </div>
 
       <div class="sec-h"><h2>🏆 팀 랭킹</h2><span class="tag">탭하면 팀원 실적</span></div>
@@ -272,10 +305,10 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
       <div id="soloRank"></div>
     </div>
 
-    <!-- 마감보고 -->
+    <!-- 판매 등록 -->
     <div id="pgReport" class="page hidden">
       <div class="report-card">
-        <h2>오늘 마감보고</h2>
+        <h2>판매 등록</h2>
         <div class="desc" id="rDesc">— 팀 · <span id="rDate">—</span></div>
 
         <div class="field">
@@ -287,20 +320,32 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
           </div>
         </div>
 
-        <label style="display:block;font-size:13px;color:var(--sub);margin:6px 0 4px;font-weight:600">판매 대수</label>
+        <label style="display:block;font-size:13px;color:var(--sub);margin:6px 0 10px;font-weight:600">색상 선택</label>
+        <div class="color-row">
+          <div class="color-chip" data-color="블랙"><div class="sw sw-black"></div><span>블랙</span></div>
+          <div class="color-chip" data-color="실버"><div class="sw sw-silver"></div><span>실버</span></div>
+          <div class="color-chip" data-color="네이비"><div class="sw sw-navy"></div><span>네이비</span></div>
+          <div class="color-chip" data-color="로즈"><div class="sw sw-rose"></div><span>로즈</span></div>
+        </div>
+
+        <label style="display:block;font-size:13px;color:var(--sub);margin:6px 0 4px;font-weight:600">수량</label>
         <div class="counter">
           <button id="rMinus">−</button>
-          <div class="disp tnum" id="rCount">0</div>
+          <div class="disp tnum" id="rCount">1</div>
           <button id="rPlus">+</button>
         </div>
         <div class="chips">
           <div class="chip" data-add="1">+1</div>
           <div class="chip" data-add="5">+5</div>
-          <div class="chip" data-add="10">+10</div>
-          <div class="chip" data-set="0">0으로</div>
+          <div class="chip" data-set="1">1로</div>
         </div>
-        <button id="rSave" class="btn">마감 저장</button>
-        <div id="rSavedNote" class="saved-note hidden">✓ 저장됐어요</div>
+        <button id="rSave" class="btn">+ 판매 추가</button>
+
+        <div class="entries-head">
+          <h3>오늘 내가 등록한 판매</h3>
+          <span class="tot"><span id="rTodayTotal">0</span>대</span>
+        </div>
+        <div id="rEntries"></div>
       </div>
     </div>
 
@@ -325,7 +370,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
       <button class="tb on" data-pg="Home">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12l9-9 9 9M5 10v10h14V10"/></svg>홈</button>
       <button class="tb" data-pg="Report">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3 8-8M4 12v7a2 2 0 002 2h12"/></svg>마감보고</button>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3 8-8M4 12v7a2 2 0 002 2h12"/></svg>판매 등록</button>
       <button class="tb" data-pg="Week">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 21h8M12 17v4M6 4h12v5a6 6 0 01-12 0zM6 6H3v2a3 3 0 003 3M18 6h3v2a3 3 0 01-3 3"/></svg>시상</button>
     </div>
@@ -415,11 +460,19 @@ async function dbRemove(path){
 /* ---------- 상태 ---------- */
 let ME = null;               // {id, name, teamId}
 let PIN_REQUIRED = true;
-let SALES_TODAY = {};        // {memberId:{units,teamId,name,...}}
+let SALES_TODAY = {};        // {memberId:{entryId:{teamId,name,color,qty,storeId,ts}}}
 let MEMBERS = {};            // {id:{name,teamId,pin}}
 let BLOCKS = {};             // {id:{type,date}}
 let STORES = {};             // 현재 팀 점포
-let reportCount = 0;
+let MY_ENTRIES = {};         // 오늘 내가 등록한 판매 (id:{color,qty,storeId,ts})
+let reportCount = 1;
+let selectedColor = null;
+
+/* ---------- 로그인 세션 저장 (새로고침해도 유지) ---------- */
+const SESSION_KEY="ploomRankingSession";
+function saveSession(){ try{ localStorage.setItem(SESSION_KEY, JSON.stringify(ME)); }catch(e){} }
+function loadSession(){ try{ const raw=localStorage.getItem(SESSION_KEY); return raw?JSON.parse(raw):null; }catch(e){ return null; } }
+function clearSession(){ try{ localStorage.removeItem(SESSION_KEY); }catch(e){} }
 
 /* ---------- 날짜 유틸 ---------- */
 function todayKey(){
@@ -521,6 +574,7 @@ document.getElementById("gEnter").addEventListener("click",async()=>{
       if(PIN_REQUIRED && !m.pin){ await dbSet("members/"+mv+"/pin", pin); } // 기존에 PIN없던 사람은 이번에 설정
       ME={id:mv,name:m.name,teamId:m.teamId};
     }
+    await saveSession();
     await enterApp();
   }catch(err){
     btn.disabled=false; btn.textContent="입장";
@@ -602,7 +656,13 @@ function setConnState(ok){
 }
 async function initData(){
   await Promise.all([pollSettings(), pollMembers(), checkConnection()]);
-  initGate();
+  const saved=loadSession();
+  if(saved && saved.id && saved.teamId){
+    ME=saved;
+    await enterApp();
+  }else{
+    initGate();
+  }
   // 폴링 시작 (게이트/앱/관리자 어느 화면이든 이 하나로 다 커버됨 - 각 함수 내부에서 필요할 때만 반영)
   setInterval(pollSettings, 8000);
   setInterval(pollMembers, 5000);
@@ -612,30 +672,60 @@ async function initData(){
 }
 
 /* ============================================================
-   홈: 팀랭킹 + 개인랭킹
+   홈: 팀랭킹 + 개인랭킹 (색상별 집계 포함)
 ============================================================ */
-function renderHome(){
-  const entries=Object.entries(SALES_TODAY);
-  const total=entries.reduce((a,[_,v])=>a+(v.units||0),0);
-  document.getElementById("hTotal").textContent=total;
-  document.getElementById("hMeta").textContent=`${entries.length}명 보고 완료`;
-
-  // 팀별 집계
-  const teams={};
-  entries.forEach(([id,v])=>{
-    const t=v.teamId; if(!teams[t]) teams[t]={sum:0,members:[]};
-    teams[t].sum+=(v.units||0);
-    teams[t].members.push({id,name:v.name,units:v.units||0});
+function colorClass(c){ return {"블랙":"black","실버":"silver","네이비":"navy","로즈":"rose"}[c]||"black"; }
+function memberAgg(entriesObj){
+  let total=0; const colors={};
+  Object.values(entriesObj||{}).forEach(e=>{
+    const q=e.qty||0; total+=q; colors[e.color]=(colors[e.color]||0)+q;
   });
+  return {total,colors};
+}
+function colorTagsHTML(colors){
+  const parts=Object.entries(colors).filter(([,q])=>q>0);
+  if(parts.length===0) return "";
+  return `<div class="meta">${parts.map(([c,q])=>`${esc(c)} ${q}`).join(" · ")}</div>`;
+}
+function renderHome(){
+  const memberIds=Object.keys(SALES_TODAY);
+  let grandTotal=0; const colorGrand={};
+  const teams={};
+  const solo=[];
+  memberIds.forEach(id=>{
+    const entriesObj=SALES_TODAY[id];
+    const first=Object.values(entriesObj||{})[0];
+    if(!first) return;
+    const {total,colors}=memberAgg(entriesObj);
+    if(total<=0) return;
+    grandTotal+=total;
+    Object.entries(colors).forEach(([c,q])=>{ colorGrand[c]=(colorGrand[c]||0)+q; });
+    const t=first.teamId;
+    if(!teams[t]) teams[t]={sum:0,members:[]};
+    teams[t].sum+=total;
+    teams[t].members.push({id,name:first.name,units:total,colors});
+    solo.push({id,name:first.name,teamId:t,units:total,colors});
+  });
+
+  document.getElementById("hTotal").textContent=grandTotal;
+  document.getElementById("hMeta").textContent=`${memberIds.length}명 보고 완료`;
+  const hc=document.getElementById("hColors");
+  const colorOrder=["블랙","실버","네이비","로즈"];
+  hc.innerHTML=colorOrder.filter(c=>colorGrand[c]>0).map(c=>`
+    <div style="display:flex;align-items:center;gap:6px;background:rgba(255,255,255,.05);padding:6px 12px;border-radius:20px">
+      <div class="sw sw-${colorClass(c)}" style="width:14px;height:14px"></div>
+      <span style="font-size:12px;font-weight:700;color:var(--tx)">${c} ${colorGrand[c]}</span>
+    </div>`).join("");
+
   const sorted=Object.entries(teams).sort((a,b)=>b[1].sum-a[1].sum);
   const tr=document.getElementById("teamRank");
-  if(sorted.length===0){ tr.innerHTML='<div class="empty">아직 오늘 보고가 없어요.<br>첫 마감보고를 올려보세요!</div>'; }
+  if(sorted.length===0){ tr.innerHTML='<div class="empty">아직 오늘 등록된 판매가 없어요.<br>첫 판매를 등록해보세요!</div>'; }
   else{
     tr.innerHTML=sorted.map(([tid,d],i)=>{
       const mem=d.members.sort((a,b)=>b.units-a.units).map((m,j)=>`
         <div class="rank ${m.id===ME.id?'me':''}">
           <div class="pos">${j+1}</div>
-          <div class="info"><div class="nm">${esc(m.name)}</div></div>
+          <div class="info"><div class="nm">${esc(m.name)}</div>${colorTagsHTML(m.colors)}</div>
           <div class="val"><b>${m.units}</b><span>대</span></div>
         </div>`).join("");
       return `<div class="rank team top${i+1<=3?i+1:''}" data-team="${tid}">
@@ -652,15 +742,13 @@ function renderHome(){
     }));
   }
 
-  // 개인 랭킹 (전체)
-  const solo=entries.map(([id,v])=>({id,name:v.name,teamId:v.teamId,units:v.units||0}))
-    .sort((a,b)=>b.units-a.units).slice(0,15);
+  const soloSorted=solo.sort((a,b)=>b.units-a.units).slice(0,15);
   const sr=document.getElementById("soloRank");
-  sr.innerHTML=solo.length===0?'<div class="empty">아직 보고된 실적이 없어요.</div>':
-    solo.map((m,i)=>`
+  sr.innerHTML=soloSorted.length===0?'<div class="empty">아직 등록된 판매가 없어요.</div>':
+    soloSorted.map((m,i)=>`
       <div class="rank ${i<3?'top'+(i+1):''} ${m.id===ME.id?'me':''}">
         <div class="pos">${i+1}</div>
-        <div class="info"><div class="nm">${esc(m.name)}</div><div class="meta">${teamName(m.teamId)}</div></div>
+        <div class="info"><div class="nm">${esc(m.name)}</div><div class="meta">${teamName(m.teamId)}${Object.keys(m.colors).length?' · '+Object.entries(m.colors).map(([c,q])=>`${c} ${q}`).join(' · '):''}</div></div>
         <div class="val"><b>${m.units}</b><span>대</span></div>
       </div>`).join("");
 }
@@ -686,18 +774,23 @@ async function loadStores(){
   }
 }
 function openReport(){
-  const mine=SALES_TODAY[ME.id];
-  reportCount=mine?mine.units:0;
+  reportCount=1;
   document.getElementById("rCount").textContent=reportCount;
-  if(mine&&mine.storeId) document.getElementById("rStore").value=mine.storeId;
-  document.getElementById("rSavedNote").classList.add("hidden");
+  selectedColor=null;
+  document.querySelectorAll(".color-chip").forEach(c=>c.classList.remove("on"));
+  refreshMyEntries();
 }
-function setCount(n){ reportCount=Math.max(0,n); document.getElementById("rCount").textContent=reportCount; }
+function setCount(n){ reportCount=Math.max(1,n); document.getElementById("rCount").textContent=reportCount; }
 document.getElementById("rPlus").addEventListener("click",()=>setCount(reportCount+1));
 document.getElementById("rMinus").addEventListener("click",()=>setCount(reportCount-1));
 document.querySelectorAll(".chip").forEach(c=>c.addEventListener("click",()=>{
   if(c.dataset.add) setCount(reportCount+Number(c.dataset.add));
   if(c.dataset.set!==undefined) setCount(Number(c.dataset.set));
+}));
+document.querySelectorAll(".color-chip").forEach(c=>c.addEventListener("click",()=>{
+  document.querySelectorAll(".color-chip").forEach(x=>x.classList.remove("on"));
+  c.classList.add("on");
+  selectedColor=c.dataset.color;
 }));
 document.getElementById("rAddStore").addEventListener("click",async()=>{
   const nm=document.getElementById("rNewStore").value.trim();
@@ -713,21 +806,61 @@ document.getElementById("rAddStore").addEventListener("click",async()=>{
 });
 document.getElementById("rSave").addEventListener("click",async()=>{
   const btn=document.getElementById("rSave");
+  if(!selectedColor){ toast("색상을 선택하세요"); return; }
+  if(reportCount<=0){ toast("수량을 확인하세요"); return; }
   const storeId=document.getElementById("rStore").value;
-  btn.disabled=true; btn.textContent="저장 중…";
+  btn.disabled=true; btn.textContent="등록 중…";
   try{
-    await dbSet("sales/"+todayKey()+"/"+ME.id, {
-      units:reportCount, teamId:ME.teamId, name:ME.name, storeId:storeId||"", ts:Date.now()
+    await dbPush("sales/"+todayKey()+"/"+ME.id, {
+      teamId:ME.teamId, name:ME.name, color:selectedColor, qty:reportCount, storeId:storeId||"", ts:Date.now()
     });
-    const n=document.getElementById("rSavedNote"); n.classList.remove("hidden");
-    toast("마감 저장 완료 ("+reportCount+"대)");
+    toast(selectedColor+" "+reportCount+"대 등록 완료");
+    setCount(1);
+    document.querySelectorAll(".color-chip").forEach(x=>x.classList.remove("on"));
+    selectedColor=null;
+    await refreshMyEntries();
+    await pollSales();
   }catch(err){
     toast("저장 실패 — 네트워크 확인");
     alert("⚠️ 저장 실패\n\n네트워크 연결을 확인하고 다시 시도해 주세요.");
   }finally{
-    btn.disabled=false; btn.textContent="마감 저장";
+    btn.disabled=false; btn.textContent="+ 판매 추가";
   }
 });
+
+/* ---------- 오늘 내가 등록한 판매 내역 ---------- */
+async function refreshMyEntries(){
+  try{ MY_ENTRIES = await dbGet("sales/"+todayKey()+"/"+ME.id) || {}; }
+  catch(e){ MY_ENTRIES={}; }
+  renderMyEntries();
+}
+function fmtTime(ts){
+  if(!ts) return "";
+  const d=new Date(ts);
+  return String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0");
+}
+function renderMyEntries(){
+  const box=document.getElementById("rEntries");
+  const list=Object.entries(MY_ENTRIES).sort((a,b)=>(b[1].ts||0)-(a[1].ts||0));
+  let total=0; list.forEach(([,e])=>total+=(e.qty||0));
+  document.getElementById("rTodayTotal").textContent=total;
+  box.innerHTML=list.length===0?'<div class="empty" style="padding:18px;font-size:13px">오늘 등록한 판매가 아직 없어요.</div>':
+    list.map(([id,e])=>`
+      <div class="entry-row">
+        <div class="ecolor sw-${colorClass(e.color)}"></div>
+        <div class="einfo"><div class="ename">${esc(e.color)}</div><div class="etime">${fmtTime(e.ts)}</div></div>
+        <div class="eqty">${e.qty}대</div>
+        <button class="edel" onclick="deleteEntry('${id}')">✕</button>
+      </div>`).join("");
+}
+window.deleteEntry=async function(id){
+  try{
+    await dbRemove("sales/"+todayKey()+"/"+ME.id+"/"+id);
+    await refreshMyEntries();
+    await pollSales();
+    toast("삭제됨");
+  }catch(err){ toast("삭제 실패 — 네트워크 확인"); }
+};
 
 /* ============================================================
    주간 시상
@@ -744,11 +877,13 @@ async function renderWeek(){
   for(const dk of dates){
     let data={};
     try{ data = await dbGet("sales/"+dk) || {}; }catch(e){}
-    Object.entries(data).forEach(([id,v])=>{
-      const u=v.units||0;
-      teamSum[v.teamId]=(teamSum[v.teamId]||0)+u;
-      if(!soloSum[id]) soloSum[id]={name:v.name,teamId:v.teamId,units:0};
-      soloSum[id].units+=u;
+    Object.entries(data).forEach(([id,entriesObj])=>{
+      const {total,colors}=memberAgg(entriesObj);
+      const first=Object.values(entriesObj||{})[0];
+      if(!first || total<=0) return;
+      teamSum[first.teamId]=(teamSum[first.teamId]||0)+total;
+      if(!soloSum[id]) soloSum[id]={name:first.name,teamId:first.teamId,units:0};
+      soloSum[id].units+=total;
     });
   }
   const box=document.getElementById("weekRank");
@@ -774,6 +909,11 @@ async function renderWeek(){
 document.getElementById("gAdminBtn").addEventListener("click",()=>{
   const p=prompt("관리자 PIN 입력");
   if(p===ADMIN_PIN){ openAdmin(); } else if(p!==null){ toast("PIN이 틀렸어요"); }
+});
+document.getElementById("logoutBtn").addEventListener("click",()=>{
+  if(confirm("로그아웃 할까요? 다음에 다시 팀·이름을 선택해야 해요.")){
+    clearSession(); location.reload();
+  }
 });
 function openAdmin(){
   show("admin");
