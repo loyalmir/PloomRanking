@@ -136,7 +136,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
 .team-members .rank{background:var(--card2);margin-bottom:6px;padding:11px 13px}
 .team-members .rank .pos{width:24px;height:24px;font-size:12px}
 
-/* ---------- 마감보고 ---------- */
+/* ---------- 판매 등록 ---------- */
 .report-card{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:20px;box-shadow:var(--shadow)}
 .report-card h2{font-size:19px;font-weight:800;margin-bottom:4px}
 .report-card .desc{font-size:13px;color:var(--sub);margin-bottom:20px}
@@ -159,7 +159,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
   background:var(--card2);border:2px solid var(--line);transition:border .15s,transform .08s;
 }
 .color-chip:active{transform:scale(.96)}
-.color-chip .sw{width:28px;height:28px;border-radius:50%;border:1px solid rgba(255,255,255,.15)}
+.color-chip .dot{width:28px;height:28px;border-radius:50%;border:1px solid rgba(255,255,255,.15)}
 .color-chip span{font-size:12px;font-weight:700;color:var(--sub)}
 .color-chip.on{border-color:var(--gold)}
 .color-chip.on span{color:var(--tx)}
@@ -298,6 +298,18 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
         <div id="hColors" style="display:flex;gap:8px;justify-content:center;margin-top:14px;flex-wrap:wrap"></div>
       </div>
 
+      <div class="report-card" id="myCard" style="margin-bottom:16px;padding:18px 20px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+          <span style="font-size:14px;font-weight:800;color:var(--teal)">📍 내 오늘 실적</span>
+          <span id="myRankTag" style="font-size:12px;color:var(--sub);font-weight:700">—</span>
+        </div>
+        <div style="display:flex;align-items:baseline;gap:6px">
+          <span id="myTotal" class="tnum" style="font-size:32px;font-weight:800">0</span>
+          <span style="font-size:14px;color:var(--sub);font-weight:700">대</span>
+        </div>
+        <div id="myColorLine" style="font-size:13px;color:var(--sub);margin-top:6px">아직 등록한 판매가 없어요</div>
+      </div>
+
       <div class="sec-h"><h2>🏆 팀 랭킹</h2><span class="tag">탭하면 팀원 실적</span></div>
       <div id="teamRank"></div>
 
@@ -322,10 +334,10 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
 
         <label style="display:block;font-size:13px;color:var(--sub);margin:6px 0 10px;font-weight:600">색상 선택</label>
         <div class="color-row">
-          <div class="color-chip" data-color="블랙"><div class="sw sw-black"></div><span>블랙</span></div>
-          <div class="color-chip" data-color="실버"><div class="sw sw-silver"></div><span>실버</span></div>
-          <div class="color-chip" data-color="네이비"><div class="sw sw-navy"></div><span>네이비</span></div>
-          <div class="color-chip" data-color="로즈"><div class="sw sw-rose"></div><span>로즈</span></div>
+          <div class="color-chip" data-color="블랙"><div class="dot sw-black"></div><span>블랙</span></div>
+          <div class="color-chip" data-color="실버"><div class="dot sw-silver"></div><span>실버</span></div>
+          <div class="color-chip" data-color="네이비"><div class="dot sw-navy"></div><span>네이비</span></div>
+          <div class="color-chip" data-color="로즈"><div class="dot sw-rose"></div><span>로즈</span></div>
         </div>
 
         <label style="display:block;font-size:13px;color:var(--sub);margin:6px 0 4px;font-weight:600">수량</label>
@@ -419,7 +431,7 @@ const firebaseConfig = {
 };
 
 /* ⚙️ 2) 관리자 마스터 PIN — 원하는 숫자로 바꾸세요 */
-const ADMIN_PIN = "5160";
+const ADMIN_PIN = "1234";
 
 /* ⚙️ 3) 운영 팀 수 (1~12팀) */
 const TEAM_COUNT = 12;
@@ -713,7 +725,7 @@ function renderHome(){
   const colorOrder=["블랙","실버","네이비","로즈"];
   hc.innerHTML=colorOrder.filter(c=>colorGrand[c]>0).map(c=>`
     <div style="display:flex;align-items:center;gap:6px;background:rgba(255,255,255,.05);padding:6px 12px;border-radius:20px">
-      <div class="sw sw-${colorClass(c)}" style="width:14px;height:14px"></div>
+      <div class="sw-${colorClass(c)}" style="width:14px;height:14px;border-radius:50%;border:1px solid rgba(255,255,255,.15)"></div>
       <span style="font-size:12px;font-weight:700;color:var(--tx)">${c} ${colorGrand[c]}</span>
     </div>`).join("");
 
@@ -742,7 +754,24 @@ function renderHome(){
     }));
   }
 
-  const soloSorted=solo.sort((a,b)=>b.units-a.units).slice(0,15);
+  const soloAllSorted=solo.slice().sort((a,b)=>b.units-a.units);
+  const mine=soloAllSorted.find(m=>m.id===ME.id);
+  const myTotalEl=document.getElementById("myTotal");
+  const myRankTag=document.getElementById("myRankTag");
+  const myColorLine=document.getElementById("myColorLine");
+  if(mine){
+    myTotalEl.textContent=mine.units;
+    const rankIdx=soloAllSorted.findIndex(m=>m.id===ME.id)+1;
+    myRankTag.textContent=`개인 ${rankIdx}위 · 전체 ${soloAllSorted.length}명 중`;
+    const parts=Object.entries(mine.colors).filter(([,q])=>q>0);
+    myColorLine.textContent=parts.length?parts.map(([c,q])=>`${c} ${q}대`).join(" · "):"아직 등록한 판매가 없어요";
+  }else{
+    myTotalEl.textContent=0;
+    myRankTag.textContent="—";
+    myColorLine.textContent="아직 등록한 판매가 없어요";
+  }
+
+  const soloSorted=soloAllSorted.slice(0,15);
   const sr=document.getElementById("soloRank");
   sr.innerHTML=soloSorted.length===0?'<div class="empty">아직 등록된 판매가 없어요.</div>':
     soloSorted.map((m,i)=>`
@@ -754,7 +783,7 @@ function renderHome(){
 }
 
 /* ============================================================
-   마감보고
+   판매 등록
 ============================================================ */
 function renderStoreOptions(){
   const sel=document.getElementById("rStore");
