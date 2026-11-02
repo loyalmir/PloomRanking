@@ -445,26 +445,49 @@ const ROOT = "ploomRanking";
    → 매장/사내 와이파이의 방화벽이 실시간 스트리밍 연결을 막는
      경우가 있어, 훨씬 더 잘 뚫리는 일반 HTTPS 방식으로 통신함.
 ============================================================ */
+/* ===== 익명 로그인 (REST) — DB 보안 규칙(auth != null) 통과용 ===== */
+const FB_ANON_KEY = "AIzaSyBU__sc4ejEOlLLCGzXKynxq_wSqq5F5qk";
+const FB_ANON_STORE = "fbAnon_ploomranking";
+let fbTokP = null;
+function fbTokSave(t){ try{ localStorage.setItem(FB_ANON_STORE, JSON.stringify(t)); }catch(e){} }
+async function fbTokFetch(){
+  let t=null; try{ t=JSON.parse(localStorage.getItem(FB_ANON_STORE)||"null"); }catch(e){}
+  if(t && t.id && t.exp > Date.now()+60000) return t.id;
+  try{
+    if(t && t.rt){
+      const r = await fetch("https://securetoken.googleapis.com/v1/token?key="+FB_ANON_KEY, {method:"POST", headers:{"Content-Type":"application/x-www-form-urlencoded"}, body:"grant_type=refresh_token&refresh_token="+encodeURIComponent(t.rt)});
+      if(r.ok){ const j=await r.json(); t={id:j.id_token, rt:j.refresh_token, exp:Date.now()+(+j.expires_in)*1000}; fbTokSave(t); return t.id; }
+    }
+    const r = await fetch("https://identitytoolkit.googleapis.com/v1/accounts:signUp?key="+FB_ANON_KEY, {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({returnSecureToken:true})});
+    if(!r.ok) return null;
+    const j = await r.json(); t={id:j.idToken, rt:j.refreshToken, exp:Date.now()+(+j.expiresIn)*1000}; fbTokSave(t); return t.id;
+  }catch(e){ console.warn("익명 로그인 실패", e); return null; }
+}
+async function fbAuthUrl(url){
+  if(!fbTokP) fbTokP = fbTokFetch().finally(()=>{ setTimeout(()=>{ fbTokP=null; }, 30000); });
+  const id = await fbTokP;
+  return id ? url + (url.includes("?")?"&":"?") + "auth=" + encodeURIComponent(id) : url;
+}
 const DB_URL = firebaseConfig.databaseURL;
 function dbPath(p){ return `${DB_URL}/${ROOT}/${p}.json`; }
 async function dbGet(path){
-  const r = await fetch(dbPath(path), {cache:"no-store"});
+  const r = await fetch(await fbAuthUrl(dbPath(path)), {cache:"no-store"});
   if(!r.ok) throw new Error("서버 응답 오류 ("+r.status+")");
   return await r.json();
 }
 async function dbSet(path, val){
-  const r = await fetch(dbPath(path), {method:"PUT", headers:{"Content-Type":"application/json"}, body:JSON.stringify(val)});
+  const r = await fetch(await fbAuthUrl(dbPath(path)), {method:"PUT", headers:{"Content-Type":"application/json"}, body:JSON.stringify(val)});
   if(!r.ok) throw new Error("저장 오류 ("+r.status+")");
   return await r.json();
 }
 async function dbPush(path, val){
-  const r = await fetch(dbPath(path), {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(val)});
+  const r = await fetch(await fbAuthUrl(dbPath(path)), {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(val)});
   if(!r.ok) throw new Error("저장 오류 ("+r.status+")");
   const data = await r.json();
   return data.name;
 }
 async function dbRemove(path){
-  const r = await fetch(dbPath(path), {method:"DELETE"});
+  const r = await fetch(await fbAuthUrl(dbPath(path)), {method:"DELETE"});
   if(!r.ok) throw new Error("삭제 오류 ("+r.status+")");
   return true;
 }
